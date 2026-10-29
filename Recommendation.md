@@ -1,56 +1,44 @@
-# Recommendation: washing-machine disaggregation for utility use
+# Recommendation: Washing-Machine Disaggregation for Utility Use
 
-*One-page summary for a utility audience. Includes the answers to Section 4.*
 
-## What the model does
+## 1. What the Model Does
 
-It estimates a home's washing-machine power minute by minute using only the whole-home smart-meter signal at 1-minute resolution. It was tested on **homes it had never seen** (leave-one-house-out), against a "predict nothing" baseline and a time-of-day-average baseline.
+The model estimates washing-machine power consumption at one-minute resolution using only the aggregate household electricity signal. It uses a `HistGradientBoostingRegressor` and is evaluated through leave-one-household-out validation, comparing performance with an always-off baseline and an hourly-profile baseline. Its purpose is to investigate appliance-level energy insights without requiring dedicated washer meters in every home.
 
-<!-- TABLE:metrics_summary -->
-<!-- /TABLE -->
+## 2. Suitable Uses
 
-## Suitable uses
+Subject to the observed evaluation results, potential applications include:
 
-✏️ TODO: fill from your results. Candidates, to keep only if your numbers support them:
-- Estimating how many washes a home does and roughly when (cycle recall, false cycles).
-- Estimating washing-machine energy over weeks (SAE), for portfolio-level insight.
-- Identifying *time-of-day* habits for tariff or demand-flexibility programmes.
+- **Household usage insights:** estimating when washing machines are typically used and identifying broad usage patterns.
+- **Portfolio-level energy analysis:** estimating washing-machine energy consumption across groups of households over several weeks.
+- **Demand flexibility programmes:** identifying evening washing activity and targeting customers with information about shifting flexible loads outside peak periods.
 
-## Limits (do not use for)
+These applications should be treated as estimates, with reliability assessed using the reported household-level and cycle-level metrics.
 
-- Billing or compliance decisions about an individual home.
-- Individual cycle energy where the error table shows large spread (see `cycle_energy_error`).
-- Any home with data at 15- or 30-minute resolution (see below).
-- Homes with different machine types or supply conditions from the training homes (e.g. India).
+## 3. Limits of the Model
 
----
+The model should not be used for individual customer billing, compliance enforcement, or other high-stakes decisions. Individual cycle-energy estimates may be unreliable where the evaluation shows large errors. Performance may also deteriorate for households, appliance types, or operating conditions that differ from the REFIT training population. Its current use of future readings also makes it suitable for offline analysis rather than strictly real-time prediction.
 
-## Section 4 answers
+## 4. Practical Opportunity: Reduce Evening-Peak Washing
 
-### Opportunity: shift washing out of the evening peak
+A utility could test a voluntary time-of-use nudge encouraging customers who frequently wash during the evening peak to use delayed-start settings or move washing to lower-demand periods. The programme could offer a reminder or a small incentive for shifting flexible consumption.
 
-How much of each home's washing energy falls in the local evening peak window:
+The analysis should first establish what proportion of washing energy occurs during the defined evening-peak window, using the household-level results in `RESULTS.md`. The opportunity is most promising if a meaningful share of washing energy occurs during that window; the size of the opportunity must be determined from the actual results.
 
-<!-- TABLE:peak_share -->
-<!-- /TABLE -->
+**How to measure success:** run a randomised controlled trial with comparable households assigned to a nudge group or a control group. Compare the change in the proportion of washing energy consumed during peak hours between the two groups, while also measuring total washing energy. A successful intervention would produce a statistically credible reduction in peak-period washing without an unwanted increase in total energy consumption. Validate the disaggregation estimates against washer sub-meter readings from a sample of participating homes to distinguish real behavioural changes from model error.
 
-✏️ TODO: choose the opportunity your numbers support. Template if the evening share is large:
-*"Homes that wash mostly in the evening peak get a time-of-use nudge (a message or small bill credit for starting delayed-start washes after the peak). Realistic, because washing is time-flexible and many machines have a delay timer."*
+## 5. Key Limitations
 
-**How to measure it:** run a randomised trial. Split similar homes into a nudge group and a no-nudge group. Compare, before vs after, the **share of washing energy in the peak window** (the model supplies this), and use the difference between the two groups as the effect (difference-in-differences). Success = a statistically clear drop in peak share in the nudge group with no rise in total washing energy. The model's own error should be checked on a small set of homes with real washer sub-meters, so that a drop in "predicted" share is not a model artefact.
+- **Overlapping appliance signatures:** simultaneous operation of a washer, kettle, dishwasher, or other high-power appliance can make their individual contributions difficult to distinguish from aggregate consumption.
+- **Missing data:** long outages remain missing and provide no reliable estimate. Cycles affected by outages may be excluded, reducing the evidence available for evaluation.
+- **Household differences:** appliance models, wash programmes, user habits, and background loads vary. Leave-one-household-out results indicate how performance changes across unseen homes.
+- **UK-to-India transfer:** the model was developed using UK household data. Differences in washing-machine designs, heating behaviour, supply conditions, power interruptions, backup systems, and appliance usage may change the observed power signatures. The model should not be deployed directly in Indian homes without local data, retraining where necessary, and validation against washer sub-meters.
 
-### Limitations
+## 6. What Changes with 15- or 30-Minute Data?
 
-- **Overlapping appliances:** when a dryer, dishwasher or kettle runs together with the washer, their signals add up and the washer's share is hard to separate (see the concurrency and failure-case tables).
-- **Missing data:** outages are left empty, not filled, so those periods give no estimate. Cycles cut by an outage are excluded from statistics.
-- **Household differences:** machines, programmes and routines differ between homes. The leave-one-house-out spread shows how much accuracy changes from one home to the next.
-- **UK to India:** the model learned from UK washers, which usually heat water electrically and show a high, clear heating peak. Many Indian machines (often top-loading, often using cold or externally heated water) have a much lower and different power signature, so a UK-trained model would likely miss or mis-size cycles. Other differences: supply voltage swings and power cuts, inverter/UPS back-up, larger appliances such as air-conditioners overlapping the washer's signal, and different habits and tariffs. **The model must be re-trained and re-checked on Indian homes (with washer sub-meters for a sample) before use.**
+At 15- or 30-minute resolution, individual washing cycles become harder to detect because each reading averages together different phases of operation, potentially hiding short heating peaks and other identifying patterns. Cycle start and end times become less precise, and washer consumption is harder to distinguish from overlapping appliances. Aggregate energy estimates and broad time-of-day usage patterns may remain useful, but individual-cycle detection and cycle-level energy estimates would require separate validation. The resolution study in `RESULTS.md` should be used to identify the point at which the model no longer improves on the hourly-profile baseline.
 
-### What gets harder with 15- or 30-minute data
+## Overall Recommendation
 
-A wash cycle lasts about 1-2 hours, so at 15- or 30-minute readings it covers only a few data points, and each point is an *average* that blends the washer's brief high-power heating phase with its quiet phases. The sharp rise and fall that identifies the washer disappear, start and end times become uncertain by up to the reading interval, and a washer's average is easily confused with a kettle or a heater. What stays feasible is a *statistical* estimate (how much washing energy over weeks, or which hours are likely), not detection of individual cycles. The resolution study in RESULTS.md quantifies this:
+Use the current model as an exploratory tool for aggregate household energy insights and carefully evaluated demand-flexibility pilots—not as a definitive appliance meter. Before operational deployment, validate its energy estimates, cycle detection, and performance across diverse households, and assess whether the results remain useful at the smart-meter resolution available to the utility.
 
-<!-- TABLE:resolution_study -->
-<!-- /TABLE -->
-
-✏️ TODO: add one sentence reading the table (at what resolution does the model stop beating the hourly-profile baseline, if it does?).
